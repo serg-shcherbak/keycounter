@@ -5,6 +5,9 @@ on:
     branches: [ "main" ]
   workflow_dispatch:
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   build:
     runs-on: macos-15
@@ -41,6 +44,8 @@ jobs:
             <string>1.0</string>
             <key>LSUIElement</key>
             <true/>
+            <key>NSAccessibilityUsageDescription</key>
+            <string>KeyCount needs access to count keystrokes for statistics.</string>
         </dict>
         </plist>
         EOF
