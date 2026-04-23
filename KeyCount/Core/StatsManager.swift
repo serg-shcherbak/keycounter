@@ -15,6 +15,10 @@ final class StatsManager: ObservableObject, KeystrokeDelegate {
     @Published var countEnter: Bool = false
     @Published var isTrusted: Bool = false
     
+    var monitorIsListening: Bool {
+        monitor.isListening
+    }
+    
     private var monitor: KeystrokeMonitor
     private var flushTimer: Timer?
     

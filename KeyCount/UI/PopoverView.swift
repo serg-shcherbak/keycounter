@@ -15,7 +15,6 @@ struct PopoverView: View {
                 
                 Spacer()
                 
-                // Троеточие с нативным меню
                 Menu {
                     Button("Settings...") {
                         openSettings()
@@ -37,7 +36,8 @@ struct PopoverView: View {
             Divider()
             
             // Onboarding banner
-            if !stats.isTrusted {
+            // Показываем только если доступа действительно нет И монитор не слушает
+            if !stats.isTrusted && !stats.monitorIsListening {
                 VStack(spacing: 12) {
                     HStack {
                         Image(systemName: "exclamationmark.triangle.fill")
@@ -116,11 +116,23 @@ struct PopoverView: View {
     }
     
     private func openSettings() {
+        // Активируем приложение перед открытием настроек
         NSApp.activate(ignoringOtherApps: true)
+        
         if #available(macOS 13.0, *) {
             NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
         } else {
             NSApp.sendAction(Selector(("showPreferencesWindow:")), to: nil, from: nil)
+        }
+        
+        // Хак: принудительно выводим окно настроек вперед
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            for window in NSApp.windows {
+                if window.title == "KeyCount Settings" || window.title == "Settings" || window.className.contains("Settings") {
+                    window.makeKeyAndOrderFront(nil)
+                    NSApp.activate(ignoringOtherApps: true)
+                }
+            }
         }
     }
 }
