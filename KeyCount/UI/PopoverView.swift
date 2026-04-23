@@ -136,20 +136,21 @@ struct PopoverView: View {
                 
                 // Troubleshoot
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Troubleshooting").font(.subheadline).foregroundColor(.secondary)
+                    Text("Diagnostics").font(.subheadline).foregroundColor(.secondary)
+                    Group {
+                        DiagnosticRow(label: "System Trusted", value: stats.isTrusted ? "YES" : "NO")
+                        DiagnosticRow(label: "Tap Created", value: stats.tapCreated ? "YES" : "NO")
+                        DiagnosticRow(label: "Tap Active", value: stats.monitorIsListening ? "YES" : "NO")
+                        DiagnosticRow(label: "Last Key Time", value: stats.lastEventTime == 0 ? "None" : Date(timeIntervalSince1970: stats.lastEventTime).formatted(date: .omitted, time: .standard))
+                    }
+                    .font(.system(size: 10, design: .monospaced))
+                    
                     Button("Restart Tracking") {
                         stats.forceRestartMonitor()
                     }
                     .buttonStyle(.bordered)
                     .controlSize(.small)
-                    
-                    Button("Open System Settings") {
-                        let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!
-                        NSWorkspace.shared.open(url)
-                    }
-                    .buttonStyle(.plain)
-                    .foregroundColor(.blue)
-                    .font(.caption)
+                    .padding(.top, 4)
                 }
                 
                 Divider()
@@ -211,6 +212,18 @@ struct StatRow: View {
             Text(NumberFormatterUtils.formatFull(value))
                 .font(.system(.body, design: .monospaced))
                 .fontWeight(.medium)
+        }
+    }
+}
+
+struct DiagnosticRow: View {
+    let label: String
+    let value: String
+    var body: some View {
+        HStack {
+            Text(label)
+            Spacer()
+            Text(value).bold()
         }
     }
 }

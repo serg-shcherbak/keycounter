@@ -14,6 +14,8 @@ final class StatsManager: ObservableObject, KeystrokeDelegate {
     @Published var countingMode: CountingMode = .smart
     @Published var countEnter: Bool = false
     @Published var isTrusted: Bool = false
+    @Published var tapCreated: Bool = false
+    @Published var lastEventTime: Double = 0
     
     var monitorIsListening: Bool {
         monitor.isListening
@@ -33,22 +35,21 @@ final class StatsManager: ObservableObject, KeystrokeDelegate {
         self.monitor.delegate = self
         self.monitor.start()
         
-        // Initial check
         self.isTrusted = self.monitor.checkPermissions()
+        self.tapCreated = self.monitor.tapCreated
         
-        // Frequent check for permissions and flushing
         self.flushTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: true) { [weak self] _ in
             Task { @MainActor in
                 guard let self = self else { return }
                 let nowTrusted = self.monitor.checkPermissions()
                 
-                // If permission state changed to true, restart monitor
-                if nowTrusted && !self.isTrusted {
+                if nowTrusted && !self.monitor.isListening {
                     self.monitor.start()
                 }
                 
-                // If monitor is actually listening, we are trusted
                 self.isTrusted = nowTrusted || self.monitor.isListening
+                self.tapCreated = self.monitor.tapCreated
+                self.lastEventTime = self.monitor.lastEventTime
                 self.flush()
             }
         }
