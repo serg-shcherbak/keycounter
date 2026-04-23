@@ -64,13 +64,8 @@ final class KeystrokeMonitor {
     }
     
     func checkPermissions() -> Bool {
-        // Проверяем Accessibility
-        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: false] as CFDictionary
-        let accessibilityTrusted = AXIsProcessTrustedWithOptions(options)
-        
-        // Для мониторинга ввода в macOS 10.15+ нам нужно именно это
-        // Но AXIsProcessTrusted обычно достаточно для ListenOnly тапа. 
-        // Если он возвращает true, а тапа нет — значит нужно пересоздать тап.
-        return accessibilityTrusted
+        // AXIsProcessTrusted() без аргументов просто возвращает текущий статус
+        // Это безопасно в Swift 6
+        return AXIsProcessTrusted()
     }
 }
