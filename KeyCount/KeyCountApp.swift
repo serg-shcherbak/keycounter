@@ -25,14 +25,12 @@ struct KeyCountApp: App {
         // Основной элемент приложения - Menu Bar
         MenuBarExtra {
             PopoverView(stats: stats)
-        } label: {
-            HStack(spacing: 4) {
-                Image(systemName: "keyboard")
-                
-                if showCountInMenubar {
-                    Text(NumberFormatterUtils.formatXK(stats.todayCount))
-                        .font(.system(.body, design: .monospaced))
-                }
+        label: {
+            if showCountInMenubar {
+                Text(NumberFormatterUtils.formatXK(stats.todayCount))
+                    .font(.system(.body, design: .monospaced))
+            } else {
+                Image(systemName: "keyboard") // Show icon if text is hidden
             }
         }
         .menuBarExtraStyle(.window) // Чтобы открывался Popover/Окно

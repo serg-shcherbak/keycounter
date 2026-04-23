@@ -10,9 +10,9 @@ struct SettingsView: View {
     var body: some View {
         Form {
             Section {
-                Toggle("Показывать счётчик в меню-баре", isOn: $showCountInMenubar)
+                Toggle("Show counter in menu bar", isOn: $showCountInMenubar)
                 
-                Toggle("Запускать при входе в систему", isOn: $launchAtLogin)
+                Toggle("Launch at login", isOn: $launchAtLogin)
                     .onChange(of: launchAtLogin) { oldValue, newValue in
                         updateLaunchAtLogin(newValue)
                     }
@@ -21,21 +21,21 @@ struct SettingsView: View {
             Divider()
             
             Section {
-                Picker("Режим подсчёта", selection: $stats.countingMode) {
+                Picker("Counting Mode", selection: $stats.countingMode) {
                     ForEach(CountingMode.allCases, id: \.self) { mode in
                         Text(mode.localizedName).tag(mode)
                     }
                 }
                 .pickerStyle(.menu)
                 
-                Toggle("Считать Enter символом", isOn: $stats.countEnter)
+                Toggle("Count Enter as a key", isOn: $stats.countEnter)
                     .disabled(stats.countingMode != .smart)
             }
             
             Divider()
             
             VStack(alignment: .leading, spacing: 4) {
-                Text("Версия 1.0.0")
+                Text("Version 1.0.0")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }

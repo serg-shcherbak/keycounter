@@ -1,28 +1,23 @@
 # KeyCount
 
-Лёгкое нативное приложение для macOS, которое живёт в строке меню, в фоне перехватывает нажатия клавиш и показывает статистику.
+A lightweight, native macOS menu bar application that tracks keystrokes and provides statistics while respecting your privacy.
 
-## Особенности
-- **SwiftData:** Нативное хранение без внешних библиотек.
-- **Приватность:** Считаются только нажатия, текст не сохраняется.
-- **Smart Mode:** Игнорирует хоткеи и модификаторы, вычитает Backspace.
-- **Производительность:** Потребление CPU < 0.5%, RAM < 20MB.
+## Features
+- **SwiftData:** Native storage with zero external dependencies.
+- **Privacy:** Counts keystrokes only. No text is ever recorded or stored.
+- **Smart Mode:** Ignores modifiers and shortcuts. Subtracts Backspace.
+- **Performance:** Ultra-low resource usage (CPU < 0.5%, RAM < 20MB).
 
-## Как собрать из исходников
+## How to Build (Cloud)
+The easiest way to get the app without installing Xcode:
+1. Go to your GitHub repository.
+2. Click the **Actions** tab.
+3. Download the latest successful **Artifact** (KeyCount-Build).
+4. Unzip and move `KeyCount.app` to your `/Applications` folder.
+5. **To Launch:** Right-click `KeyCount.app` -> **Open**.
+6. If it says "damaged", run this in Terminal: `xattr -cr /Applications/KeyCount.app`
 
-1. Склонируйте репозиторий.
-2. Откройте Xcode и создайте новый проект **macOS -> App**.
-3. Назовите его `KeyCount`.
-4. Удалите стандартные файлы и перетащите в проект папку `KeyCount/` из этого репозитория.
-5. В настройках проекта (**Signing & Capabilities**):
-   - Укажите свой **Team ID**.
-   - Измените **Bundle Identifier**.
-6. В файле `Info.plist` (или в настройках Target -> Info):
-   - Добавьте `Application is agent (UIElement) = YES`.
-   - Добавьте `Privacy - Accessibility Usage Description` с пояснением.
-7. Соберите и запустите (Cmd + R).
-
-## Требования
+## Local Development Requirements
 - macOS 15.0+ (Sequoia)
 - Xcode 16.0+
 - Swift 6.0

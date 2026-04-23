@@ -2,106 +2,113 @@ import SwiftUI
 
 struct PopoverView: View {
     @ObservedObject var stats: StatsManager
-    @Environment(\.openWindow) var openWindow
     
-    // Состояние для подтверждения сброса
     @State private var showingResetTodayAlert = false
     @State private var showingResetAllAlert = false
     
     var body: some View {
         VStack(spacing: 0) {
-            // Заголовок
+            // Header
             HStack {
-                Image(systemName: "keyboard")
-                    .font(.title2)
                 Text("KeyCount")
                     .font(.headline)
                 
                 Spacer()
                 
-                Button(action: {
-                    // Открыть настройки
-                    NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
-                    NSApp.activate(ignoringOtherApps: true)
-                }) {
-                    Image(systemName: "ellipsis")
-                        .font(.title2)
+                Menu {
+                    Button("Settings...") {
+                        NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+                        NSApp.activate(ignoringOtherApps: true)
+                    }
+                    Divider()
+                    Button("Quit KeyCount") {
+                        NSApp.terminate(nil)
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                        .font(.title3)
                         .foregroundColor(.secondary)
                 }
-                .buttonStyle(.plain)
+                .menuStyle(.borderlessButton)
+                .fixedSize()
             }
             .padding()
             
             Divider()
             
-            // Onboarding баннер
+            // Onboarding banner
             if !stats.isTrusted {
-                VStack(spacing: 8) {
+                VStack(spacing: 10) {
                     HStack {
-                        Image(systemName: "exclamationmark.triangle")
+                        Image(systemName: "exclamationmark.triangle.fill")
                             .foregroundColor(.orange)
-                        Text("Нужен доступ к вводу")
-                            .font(.headline)
+                        Text("Input Access Required")
+                            .font(.subheadline)
+                            .fontWeight(.bold)
                     }
-                    Text("KeyCount считает нажатия клавиш, но не записывает текст. Откройте Системные настройки и разрешите доступ.")
+                    Text("KeyCount needs Input Monitoring access to count keystrokes. It does not record text.")
                         .font(.caption)
                         .multilineTextAlignment(.center)
                         .foregroundColor(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                     
-                    Button("Открыть Системные настройки") {
+                    Button("Open System Settings") {
                         let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!
                         NSWorkspace.shared.open(url)
                     }
                     .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
                 }
                 .padding()
                 Divider()
             }
             
-            // Статистика
+            // Stats
             VStack(spacing: 12) {
-                StatRow(label: "Сегодня", value: stats.todayCount)
-                StatRow(label: "Последний час", value: stats.lastHourCount)
+                StatRow(label: "Today", value: stats.todayCount)
+                StatRow(label: "Last Hour", value: stats.lastHourCount)
                 
                 Divider().padding(.vertical, 4)
                 
-                StatRow(label: "Среднее в час", value: stats.averagePerHour)
-                StatRow(label: "Среднее в сутки", value: stats.averagePerDay())
+                StatRow(label: "Avg per Hour", value: stats.averagePerHour)
+                StatRow(label: "Avg per Day", value: stats.averagePerDay())
                 
                 Divider().padding(.vertical, 4)
                 
-                StatRow(label: "Всего", value: stats.totalCount)
+                StatRow(label: "Total", value: stats.totalCount)
             }
             .padding()
             
             Divider()
             
-            // Кнопки сброса
-            HStack(spacing: 12) {
-                Button("Сбросить сегодня") {
+            // Action Buttons
+            HStack(spacing: 8) {
+                Button("Reset Today") {
                     showingResetTodayAlert = true
                 }
                 .buttonStyle(.bordered)
+                .controlSize(.small)
                 
-                Button("Полный сброс") {
+                Button("Full Reset") {
                     showingResetAllAlert = true
                 }
                 .buttonStyle(.bordered)
+                .controlSize(.small)
             }
             .padding()
         }
-        .frame(width: 260)
-        .alert("Сбросить сегодня", isPresented: $showingResetTodayAlert) {
-            Button("Сбросить сегодня", role: .destructive) { stats.resetToday() }
-            Button("Отмена", role: .cancel) { }
+        .frame(width: 280) // Slightly wider to fit text
+        .alert("Reset Today", isPresented: $showingResetTodayAlert) {
+            Button("Reset Today", role: .destructive) { stats.resetToday() }
+            Button("Cancel", role: .cancel) { }
         } message: {
-            Text("Данные за сегодняшний день будут удалены. Статистика прошлых дней сохранится.")
+            Text("Today's data will be deleted. Past history remains safe.")
         }
-        .alert("Полный сброс", isPresented: $showingResetAllAlert) {
-            Button("Сбросить всё", role: .destructive) { stats.resetAll() }
-            Button("Отмена", role: .cancel) { }
+        .alert("Full Reset", isPresented: $showingResetAllAlert) {
+            Button("Reset All", role: .destructive) { stats.resetAll() }
+            Button("Cancel", role: .cancel) { }
         } message: {
-            Text("Все данные будут удалены: история, общий счётчик, статистика по дням.\nЭто действие необратимо.")
+            Text("All data will be permanently deleted: history, totals, and daily stats.")
         }
     }
 }

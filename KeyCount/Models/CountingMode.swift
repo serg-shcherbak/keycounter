@@ -7,9 +7,9 @@ enum CountingMode: String, Codable, CaseIterable {
     
     var localizedName: String {
         switch self {
-        case .smart: return "Умный подсчет"
-        case .allExceptModifiers: return "Все кроме модификаторов"
-        case .allKeyDown: return "Полный подсчет"
+        case .smart: return "Smart Counting"
+        case .allExceptModifiers: return "All except Modifiers"
+        case .allKeyDown: return "All Keystrokes"
         }
     }
 }
