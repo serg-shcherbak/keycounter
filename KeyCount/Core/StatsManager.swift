@@ -37,10 +37,13 @@ final class StatsManager: ObservableObject, KeystrokeDelegate {
         
         self.isTrusted = self.monitor.checkPermissions()
         
-        // Таймер для периодического сохранения (раз в 30 секунд по ТЗ)
-        self.flushTimer = Timer.scheduledTimer(withTimeInterval: 30.0, repeats: true) { [weak self] _ in
+        self.flushTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
             Task { @MainActor in
-                self?.isTrusted = self?.monitor.checkPermissions() ?? false
+                let nowTrusted = self?.monitor.checkPermissions() ?? false
+                if nowTrusted && !(self?.isTrusted ?? true) {
+                    self?.monitor.start() // Restart if permissions granted
+                }
+                self?.isTrusted = nowTrusted
                 self?.flush()
             }
         }

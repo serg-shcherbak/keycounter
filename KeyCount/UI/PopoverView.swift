@@ -15,22 +15,15 @@ struct PopoverView: View {
                 
                 Spacer()
                 
-                Menu {
-                    Button("Settings...") {
-                        NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
-                        NSApp.activate(ignoringOtherApps: true)
-                    }
-                    Divider()
-                    Button("Quit KeyCount") {
-                        NSApp.terminate(nil)
-                    }
+                // Троеточие - заменяем Menu на кнопку, которая открывает нативное меню
+                Button {
+                    showContextMenu()
                 } label: {
                     Image(systemName: "ellipsis.circle")
                         .font(.title3)
                         .foregroundColor(.secondary)
                 }
-                .menuStyle(.borderlessButton)
-                .fixedSize()
+                .buttonStyle(.plain)
             }
             .padding()
             
@@ -38,26 +31,32 @@ struct PopoverView: View {
             
             // Onboarding banner
             if !stats.isTrusted {
-                VStack(spacing: 10) {
+                VStack(spacing: 12) {
                     HStack {
                         Image(systemName: "exclamationmark.triangle.fill")
                             .foregroundColor(.orange)
-                        Text("Input Access Required")
+                        Text("Permission Required")
                             .font(.subheadline)
                             .fontWeight(.bold)
                     }
-                    Text("KeyCount needs Input Monitoring access to count keystrokes. It does not record text.")
+                    
+                    Text("1. Open System Settings\n2. Go to Privacy & Security\n3. Select **Input Monitoring**\n4. Enable **KeyCount**")
                         .font(.caption)
-                        .multilineTextAlignment(.center)
+                        .multilineTextAlignment(.leading)
                         .foregroundColor(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                     
                     Button("Open System Settings") {
-                        let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!
+                        // Открываем конкретно Input Monitoring
+                        let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent")!
                         NSWorkspace.shared.open(url)
                     }
                     .buttonStyle(.borderedProminent)
                     .controlSize(.small)
+                    
+                    Text("Note: If already enabled, toggle it OFF and ON again.")
+                        .font(.system(size: 9))
+                        .foregroundColor(.secondary)
                 }
                 .padding()
                 Divider()
@@ -82,22 +81,20 @@ struct PopoverView: View {
             Divider()
             
             // Action Buttons
-            HStack(spacing: 8) {
+            HStack(spacing: 10) {
                 Button("Reset Today") {
                     showingResetTodayAlert = true
                 }
                 .buttonStyle(.bordered)
-                .controlSize(.small)
                 
                 Button("Full Reset") {
                     showingResetAllAlert = true
                 }
                 .buttonStyle(.bordered)
-                .controlSize(.small)
             }
             .padding()
         }
-        .frame(width: 280) // Slightly wider to fit text
+        .frame(width: 280)
         .alert("Reset Today", isPresented: $showingResetTodayAlert) {
             Button("Reset Today", role: .destructive) { stats.resetToday() }
             Button("Cancel", role: .cancel) { }
@@ -110,6 +107,16 @@ struct PopoverView: View {
         } message: {
             Text("All data will be permanently deleted: history, totals, and daily stats.")
         }
+    }
+    
+    private func showContextMenu() {
+        let menu = NSMenu()
+        menu.addItem(NSMenuItem(title: "Settings...", action: Selector(("showSettingsWindow:")), keyEquivalent: ","))
+        menu.addItem(NSMenuItem.separator())
+        menu.addItem(NSMenuItem(title: "Quit KeyCount", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
+        
+        let event = NSApp.currentEvent
+        NSMenu.popUpContextMenu(menu, with: event ?? NSEvent(), for: NSApp.keyWindow?.contentView ?? NSView())
     }
 }
 

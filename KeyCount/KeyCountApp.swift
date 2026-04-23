@@ -3,10 +3,7 @@ import SwiftData
 
 @main
 struct KeyCountApp: App {
-    // SwiftData container
     let container: ModelContainer
-    
-    // Stats manager (StateObject for lifecycle)
     @StateObject private var stats: StatsManager
     
     @AppStorage("showCountInMenubar") private var showCountInMenubar = true
@@ -22,20 +19,20 @@ struct KeyCountApp: App {
     }
     
     var body: some Scene {
-        // Main Menu Bar Extra
         MenuBarExtra {
             PopoverView(stats: stats)
         } label: {
             if showCountInMenubar {
+                // Только текст, без иконки
                 Text(NumberFormatterUtils.formatXK(stats.todayCount))
                     .font(.system(.body, design: .monospaced))
             } else {
+                // Если текст скрыт, показываем только иконку
                 Image(systemName: "keyboard")
             }
         }
         .menuBarExtraStyle(.window)
         
-        // Settings Window
         Settings {
             SettingsView(stats: stats)
         }

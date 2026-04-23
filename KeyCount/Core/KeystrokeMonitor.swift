@@ -11,18 +11,15 @@ final class KeystrokeMonitor {
     private var runLoopSource: CFRunLoopSource?
     weak var delegate: KeystrokeDelegate?
     
-    // Мьютекс для состояния разрешений
     private(set) var isListening = false
     
     init() {}
     
     func start() {
-        guard !isListening else { return }
+        if isListening { stop() }
         
-        // Маска событий: только keyDown
         let eventMask = (1 << CGEventType.keyDown.rawValue)
         
-        // Создаем tap в режиме listenOnly (passive)
         eventTap = CGEvent.tapCreate(
             tap: .cgSessionEventTap,
             place: .headInsertEventTap,
@@ -42,7 +39,7 @@ final class KeystrokeMonitor {
         )
         
         guard let eventTap = eventTap else {
-            print("Failed to create event tap. Check accessibility permissions.")
+            isListening = false
             return
         }
         
@@ -55,17 +52,25 @@ final class KeystrokeMonitor {
     }
     
     func stop() {
-        guard isListening else { return }
         if let tap = eventTap {
             CGEvent.tapEnable(tap: tap, enable: false)
         }
         if let source = runLoopSource {
             CFRunLoopRemoveSource(CFRunLoopGetMain(), source, .commonModes)
         }
+        eventTap = nil
+        runLoopSource = nil
         isListening = false
     }
     
     func checkPermissions() -> Bool {
-        return AXIsProcessTrusted()
+        // Проверяем Accessibility
+        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: false] as CFDictionary
+        let accessibilityTrusted = AXIsProcessTrustedWithOptions(options)
+        
+        // Для мониторинга ввода в macOS 10.15+ нам нужно именно это
+        // Но AXIsProcessTrusted обычно достаточно для ListenOnly тапа. 
+        // Если он возвращает true, а тапа нет — значит нужно пересоздать тап.
+        return accessibilityTrusted
     }
 }
