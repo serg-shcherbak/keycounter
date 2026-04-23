@@ -23,18 +23,12 @@ struct KeyCountApp: App {
             PopoverView(stats: stats)
         } label: {
             if showCountInMenubar {
-                // Только текст, без иконки
                 Text(NumberFormatterUtils.formatXK(stats.todayCount))
                     .font(.system(.body, design: .monospaced))
             } else {
-                // Если текст скрыт, показываем только иконку
                 Image(systemName: "keyboard")
             }
         }
         .menuBarExtraStyle(.window)
-        
-        Settings {
-            SettingsView(stats: stats)
-        }
     }
 }

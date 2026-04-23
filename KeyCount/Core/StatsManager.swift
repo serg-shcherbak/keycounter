@@ -193,6 +193,12 @@ final class StatsManager: ObservableObject, KeystrokeDelegate {
         }
     }
     
+    func forceRestartMonitor() {
+        monitor.stop()
+        monitor.start()
+        isTrusted = monitor.checkPermissions()
+    }
+    
     var averagePerHour: Int {
         let calendar = Calendar.current
         let now = Date()
