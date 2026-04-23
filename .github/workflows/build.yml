@@ -35,7 +35,7 @@ jobs:
             <key>CFBundleExecutable</key>
             <string>KeyCount</string>
             <key>CFBundleIdentifier</key>
-            <string>com.yourname.KeyCount</string>
+            <string>org.keycount.app</string>
             <key>CFBundleName</key>
             <string>KeyCount</string>
             <key>CFBundlePackageType</key>

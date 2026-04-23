@@ -35,13 +35,14 @@ final class StatsManager: ObservableObject, KeystrokeDelegate {
         self.monitor.delegate = self
         self.monitor.start()
         
-        self.isTrusted = self.monitor.checkPermissions()
+        self.isTrusted = self.monitor.checkPermissionsSilent()
         self.tapCreated = self.monitor.tapCreated
         
+        // Timer only checks SILENTLY every 3 seconds
         self.flushTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: true) { [weak self] _ in
             Task { @MainActor in
                 guard let self = self else { return }
-                let nowTrusted = self.monitor.checkPermissions()
+                let nowTrusted = self.monitor.checkPermissionsSilent()
                 
                 if nowTrusted && !self.monitor.isListening {
                     self.monitor.start()
@@ -55,6 +56,10 @@ final class StatsManager: ObservableObject, KeystrokeDelegate {
         }
     }
     
+    func requestSystemPermissions() {
+        monitor.requestPermissionsWithPrompt()
+    }
+    
     nonisolated func didCaptureKey(event: CGEvent) {
         let flags = event.flags
         let keyCode = Int(event.getIntegerValueField(.keyboardEventKeycode))
@@ -65,7 +70,6 @@ final class StatsManager: ObservableObject, KeystrokeDelegate {
     }
     
     private func processKeyEvent(flags: CGEventFlags, keyCode: Int) {
-        // If we received an event, we definitely have permission
         if !isTrusted { isTrusted = true }
         
         var shouldCount = false
@@ -138,7 +142,7 @@ final class StatsManager: ObservableObject, KeystrokeDelegate {
             currentMinuteCount = 0
             refreshStats()
         } catch {
-            print("Failed to save: \(error)")
+            print("Save error: \(error)")
         }
     }
     
@@ -147,10 +151,8 @@ final class StatsManager: ObservableObject, KeystrokeDelegate {
         let calendar = Calendar.current
         let midnight = calendar.startOfDay(for: now)
         todayCount = sum(from: midnight, to: now)
-        
         let hourAgo = now.addingTimeInterval(-3600)
         lastHourCount = sum(from: hourAgo, to: now)
-        
         totalCount = sum(from: .distantPast, to: .distantFuture)
     }
     
@@ -196,10 +198,10 @@ final class StatsManager: ObservableObject, KeystrokeDelegate {
     
     func forceRestartMonitor() {
         monitor.stop()
-        monitor = KeystrokeMonitor() // Create fresh object
+        monitor = KeystrokeMonitor()
         monitor.delegate = self
         monitor.start()
-        isTrusted = monitor.checkPermissions()
+        isTrusted = monitor.checkPermissionsSilent()
     }
     
     var averagePerHour: Int {

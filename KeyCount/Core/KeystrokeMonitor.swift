@@ -30,7 +30,7 @@ final class KeystrokeMonitor {
         thread = Thread { [weak self] in
             self?.run()
         }
-        thread?.name = "com.keycount.monitor"
+        thread?.name = "org.keycount.monitor"
         thread?.start()
     }
     
@@ -88,10 +88,15 @@ final class KeystrokeMonitor {
         thread = nil
     }
     
-    func checkPermissions() -> Bool {
-        // Пробуем вызвать системный запрос, если доступа нет
+    // ТИХАЯ проверка прав (без вызова окна)
+    func checkPermissionsSilent() -> Bool {
+        return AXIsProcessTrusted()
+    }
+    
+    // ПРИНУДИТЕЛЬНЫЙ запрос прав (с вызовом окна)
+    func requestPermissionsWithPrompt() {
         let options = ["AXTrustedCheckOptionPrompt": true] as CFDictionary
-        return AXIsProcessTrustedWithOptions(options)
+        _ = AXIsProcessTrustedWithOptions(options)
     }
 }
 

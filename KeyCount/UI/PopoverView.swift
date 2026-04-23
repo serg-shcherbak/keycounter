@@ -54,7 +54,6 @@ struct PopoverView: View {
         .frame(width: 280)
     }
     
-    // MARK: - Stats View
     var statsView: some View {
         VStack(spacing: 0) {
             if !stats.isTrusted && !stats.monitorIsListening {
@@ -107,7 +106,6 @@ struct PopoverView: View {
         }
     }
     
-    // MARK: - Settings View
     var settingsView: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
@@ -134,27 +132,33 @@ struct PopoverView: View {
                 
                 Divider()
                 
-                // Troubleshoot
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Diagnostics").font(.subheadline).foregroundColor(.secondary)
                     Group {
                         DiagnosticRow(label: "Bundle ID", value: Bundle.main.bundleIdentifier ?? "Unknown")
-                        DiagnosticRow(label: "System Trusted", value: stats.isTrusted ? "YES" : "NO")
+                        DiagnosticRow(label: "Trusted", value: stats.isTrusted ? "YES" : "NO")
                         DiagnosticRow(label: "Tap Created", value: stats.tapCreated ? "YES" : "NO")
                         DiagnosticRow(label: "Tap Active", value: stats.monitorIsListening ? "YES" : "NO")
-                        DiagnosticRow(label: "Last Key Time", value: stats.lastEventTime == 0 ? "None" : Date(timeIntervalSince1970: stats.lastEventTime).formatted(date: .omitted, time: .standard))
                     }
                     .font(.system(size: 10, design: .monospaced))
                     
                     if !stats.isTrusted {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("If Trusted is NO but checkbox is ON:").bold().font(.caption)
-                            Text("Run in Terminal to reset permissions:")
-                                .font(.system(size: 8))
-                            Text("tccutil reset Accessibility \(Bundle.main.bundleIdentifier ?? "com.yourname.KeyCount")")
-                                .font(.system(size: 8, design: .monospaced))
-                                .padding(4)
-                                .background(Color.black.opacity(0.05))
+                            
+                            let cmd = "tccutil reset Accessibility \(Bundle.main.bundleIdentifier ?? "org.keycount.app")"
+                            
+                            Button(action: {
+                                NSPasteboard.general.clearContents()
+                                NSPasteboard.general.setString(cmd, forType: .string)
+                            }) {
+                                HStack {
+                                    Image(systemName: "doc.on.doc")
+                                    Text("Copy Reset Command")
+                                }
+                                .font(.caption)
+                            }
+                            .buttonStyle(.bordered)
                         }
                         .padding(.top, 4)
                     }
@@ -164,7 +168,6 @@ struct PopoverView: View {
                     }
                     .buttonStyle(.bordered)
                     .controlSize(.small)
-                    .padding(.top, 4)
                 }
                 
                 Divider()
@@ -180,7 +183,7 @@ struct PopoverView: View {
                 }
                 .buttonStyle(.bordered)
                 
-                Text("Version 1.0.4")
+                Text("Version 1.0.8")
                     .font(.system(size: 9))
                     .foregroundColor(.secondary)
                     .frame(maxWidth: .infinity, alignment: .center)
@@ -198,12 +201,13 @@ struct PopoverView: View {
                 Text("Permission Required")
                     .font(.subheadline).bold()
             }
-            Text("Enable KeyCount in System Settings -> Accessibility. If already enabled, toggle it OFF and ON.")
+            Text("1. Open System Settings\n2. REMOVE KeyCount from Accessibility using '-' button\n3. Click 'Open Settings' below and grant access again")
                 .font(.system(size: 10))
                 .multilineTextAlignment(.center)
                 .foregroundColor(.secondary)
             
             Button("Open Settings") {
+                stats.requestSystemPermissions()
                 let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!
                 NSWorkspace.shared.open(url)
             }
@@ -218,7 +222,6 @@ struct PopoverView: View {
 struct StatRow: View {
     let label: String
     let value: Int
-    
     var body: some View {
         HStack {
             Text(label).foregroundColor(.secondary)
