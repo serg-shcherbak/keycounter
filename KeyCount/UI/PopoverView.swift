@@ -237,7 +237,7 @@ struct StatGroup<Content: View>: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(title).font(.system(size: 10, weight: .bold)).foregroundColor(.secondary).uppercaseSmallCaps()
+            Text(title).font(.system(size: 10, weight: .bold)).foregroundColor(.secondary)
             content
         }
     }

@@ -6,7 +6,7 @@ protocol KeystrokeDelegate: AnyObject {
     func didCaptureKey(event: CGEvent)
 }
 
-final class KeystrokeMonitor {
+final class KeystrokeMonitor: @unchecked Sendable {
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
     private var thread: Thread?
