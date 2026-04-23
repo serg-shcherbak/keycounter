@@ -13,7 +13,6 @@ final class KeystrokeMonitor {
     
     weak var delegate: KeystrokeDelegate?
     
-    // Diagnostics
     private let _isListening = AtomicBool(false)
     private let _tapCreated = AtomicBool(false)
     private let _lastEventTime = AtomicDouble(0)
@@ -25,7 +24,7 @@ final class KeystrokeMonitor {
     init() {}
     
     func start() {
-        guard !_isListening.value else { return }
+        if _isListening.value { stop() }
         
         _tapCreated.set(false)
         thread = Thread { [weak self] in
@@ -38,7 +37,6 @@ final class KeystrokeMonitor {
     private func run() {
         let eventMask = (1 << CGEventType.keyDown.rawValue)
         
-        // Попробуем вернуться к .cgSessionEventTap, он более стандартный
         eventTap = CGEvent.tapCreate(
             tap: .cgSessionEventTap, 
             place: .headInsertEventTap,
@@ -59,12 +57,10 @@ final class KeystrokeMonitor {
         )
         
         guard let eventTap = eventTap else {
-            print("KeystrokeMonitor: Failed to create tap")
             return
         }
         
         _tapCreated.set(true)
-        
         runLoopSource = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, eventTap, 0)
         guard let source = runLoopSource else { return }
         
@@ -93,11 +89,12 @@ final class KeystrokeMonitor {
     }
     
     func checkPermissions() -> Bool {
-        return AXIsProcessTrusted()
+        // Пробуем вызвать системный запрос, если доступа нет
+        let options = ["AXTrustedCheckOptionPrompt": true] as CFDictionary
+        return AXIsProcessTrustedWithOptions(options)
     }
 }
 
-// Helpers
 final class AtomicBool: @unchecked Sendable {
     private let lock = NSLock(); private var v: Bool
     init(_ v: Bool) { self.v = v }

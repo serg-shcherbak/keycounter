@@ -138,12 +138,26 @@ struct PopoverView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Diagnostics").font(.subheadline).foregroundColor(.secondary)
                     Group {
+                        DiagnosticRow(label: "Bundle ID", value: Bundle.main.bundleIdentifier ?? "Unknown")
                         DiagnosticRow(label: "System Trusted", value: stats.isTrusted ? "YES" : "NO")
                         DiagnosticRow(label: "Tap Created", value: stats.tapCreated ? "YES" : "NO")
                         DiagnosticRow(label: "Tap Active", value: stats.monitorIsListening ? "YES" : "NO")
                         DiagnosticRow(label: "Last Key Time", value: stats.lastEventTime == 0 ? "None" : Date(timeIntervalSince1970: stats.lastEventTime).formatted(date: .omitted, time: .standard))
                     }
                     .font(.system(size: 10, design: .monospaced))
+                    
+                    if !stats.isTrusted {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("If Trusted is NO but checkbox is ON:").bold().font(.caption)
+                            Text("Run in Terminal to reset permissions:")
+                                .font(.system(size: 8))
+                            Text("tccutil reset Accessibility \(Bundle.main.bundleIdentifier ?? "com.yourname.KeyCount")")
+                                .font(.system(size: 8, design: .monospaced))
+                                .padding(4)
+                                .background(Color.black.opacity(0.05))
+                        }
+                        .padding(.top, 4)
+                    }
                     
                     Button("Restart Tracking") {
                         stats.forceRestartMonitor()
