@@ -65,7 +65,7 @@ struct PopoverView: View {
                 
                 StatGroup(title: "Averages") {
                     StatRow(label: "Per Hour", value: stats.averagePerHour)
-                    StatRow(label: "Per Day", value: stats.averagePerDay())
+                    StatRow(label: "Per Day", value: stats.averagePerDay)
                 }
                 
                 Divider().padding(.vertical, 2)
@@ -189,7 +189,7 @@ struct PopoverView: View {
                 }
                 .buttonStyle(.bordered)
                 
-                Text("KeyCount v1.0.9 (Production Ready)")
+                Text("KeyCount v1.2 (Production Ready)")
                     .font(.system(size: 9))
                     .foregroundColor(.secondary)
                     .frame(maxWidth: .infinity, alignment: .center)

@@ -1,4 +1,4 @@
-# ⌨️ KeyCount v1.0
+# ⌨️ KeyCount v1.2
 
 KeyCount is a minimalist, native macOS menu bar application designed to track your keyboard activity while ensuring absolute privacy. It provides real-time statistics on your keystrokes without ever recording the content of what you type.
 
