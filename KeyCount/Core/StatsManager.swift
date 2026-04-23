@@ -48,17 +48,23 @@ final class StatsManager: ObservableObject, KeystrokeDelegate {
     
     // MARK: - KeystrokeDelegate
     
-    func didCaptureKey(event: CGEvent) {
+    // Делаем метод неизолированным для соответствия протоколу, 
+    // но сразу перебрасываем выполнение на MainActor
+    nonisolated func didCaptureKey(event: CGEvent) {
         let flags = event.flags
         let keyCode = Int(event.getIntegerValueField(.keyboardEventKeycode))
         
+        Task { @MainActor in
+            self.processKeyEvent(flags: flags, keyCode: keyCode)
+        }
+    }
+    
+    private func processKeyEvent(flags: CGEventFlags, keyCode: Int) {
         var shouldCount = false
-        var isBackspace = (keyCode == 51) // macOS backspace keycode
+        let isBackspace = (keyCode == 51) // macOS backspace keycode
         
         switch countingMode {
         case .smart:
-            // Игнорируем если нажаты Cmd (maskCommand), Option (maskAlternate), Control (maskControl)
-            // Но позволяем Shift (maskShift) для заглавных букв
             let hasModifiers = flags.contains(.maskCommand) || 
                                flags.contains(.maskAlternate) || 
                                flags.contains(.maskControl)
@@ -69,17 +75,12 @@ final class StatsManager: ObservableObject, KeystrokeDelegate {
                 } else if keyCode == 36 { // Enter
                     shouldCount = countEnter
                 } else {
-                    // Проверяем, не является ли это "чистым" модификатором (хотя tapkeyDown их не должен слать отдельно)
-                    // Но для надежности в Smart режиме считаем только печатные символы.
                     shouldCount = true
                 }
             }
             
         case .allExceptModifiers:
-            // Проверка на чистые модификаторы (Shift, Cmd, и т.д.)
-            // В CGEvent keyDown чистые модификаторы не генерируют события с keyDown типом обычно, 
-            // но мы доверяем ТЗ: считаем всё кроме них.
-            let modifierKeyCodes = Set([54, 55, 56, 57, 58, 59, 60, 61, 62, 63]) // Примерный список кодов
+            let modifierKeyCodes = Set([54, 55, 56, 57, 58, 59, 60, 61, 62, 63])
             shouldCount = !modifierKeyCodes.contains(keyCode)
             
         case .allKeyDown:
@@ -105,7 +106,6 @@ final class StatsManager: ObservableObject, KeystrokeDelegate {
     }
     
     private func decrement() {
-        // Уменьшаем только если в текущем бакете не 0 (как в ТЗ)
         if currentMinuteCount > 0 {
             currentMinuteCount -= 1
             todayCount = max(0, todayCount - 1)
@@ -132,7 +132,7 @@ final class StatsManager: ObservableObject, KeystrokeDelegate {
             }
             try modelContext.save()
             currentMinuteCount = 0
-            refreshStats() // Пересчитываем скользящие окна
+            refreshStats()
         } catch {
             print("Failed to save buckets: \(error)")
         }
@@ -140,18 +140,13 @@ final class StatsManager: ObservableObject, KeystrokeDelegate {
     
     func refreshStats() {
         let now = Date()
-        
-        // 1. Сегодня (с 00:00)
         let calendar = Calendar.current
         let midnight = calendar.startOfDay(for: now)
         todayCount = sum(from: midnight, to: now)
         
-        // 2. Последний час (скользящее окно 60 мин)
         let hourAgo = now.addingTimeInterval(-3600)
         lastHourCount = sum(from: hourAgo, to: now)
         
-        // 3. Всего (сумма по всем бакетам)
-        // Для производительности можно хранить total_count отдельно, но ТЗ разрешает SQL агрегацию.
         totalCount = sum(from: .distantPast, to: .distantFuture)
     }
     
@@ -208,11 +203,6 @@ final class StatsManager: ObservableObject, KeystrokeDelegate {
     }
     
     func averagePerDay() -> Int {
-        // Количество дней с count > 0
-        // Это требует группировки по дням. 
-        // В v1 можно сделать просто: (total) / (дни с установки).
-        // Но по ТЗ: "дней с count > 0".
-        
         do {
             let buckets = try modelContext.fetch(FetchDescriptor<KeyBucket>())
             let days = Set(buckets.filter { $0.count > 0 }.map { Calendar.current.startOfDay(for: $0.timestamp) })
