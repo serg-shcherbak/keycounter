@@ -10,6 +10,7 @@ final class StatsManager: ObservableObject, KeystrokeDelegate {
     @Published private(set) var todayCount: Int = 0
     @Published private(set) var lastHourCount: Int = 0
     @Published private(set) var totalCount: Int = 0
+    @Published private(set) var activeDays: Int = 1
     
     @Published var countingMode: CountingMode = .smart
     @Published var countEnter: Bool = false
@@ -23,8 +24,10 @@ final class StatsManager: ObservableObject, KeystrokeDelegate {
     
     private var monitor: KeystrokeMonitor
     private var flushTimer: Timer?
+    private var uiTimer: Timer?
     
     private var currentMinuteCount: Int = 0
+    private var lastKnownDay: Date = Date.distantPast
     
     init(modelContainer: ModelContainer) {
         self.modelContext = ModelContext(modelContainer)
@@ -38,20 +41,40 @@ final class StatsManager: ObservableObject, KeystrokeDelegate {
         self.isTrusted = self.monitor.checkPermissionsSilent()
         self.tapCreated = self.monitor.tapCreated
         
-        // Timer only checks SILENTLY every 3 seconds
-        self.flushTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: true) { [weak self] _ in
+        // Timer for flushing to DB (every 30s)
+        self.flushTimer = Timer.scheduledTimer(withTimeInterval: 30.0, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                self?.flush()
+            }
+        }
+        
+        // Timer for UI updates and permission checks (every 3s)
+        self.uiTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: true) { [weak self] _ in
             Task { @MainActor in
                 guard let self = self else { return }
-                let nowTrusted = self.monitor.checkPermissionsSilent()
                 
-                if nowTrusted && !self.monitor.isListening {
-                    self.monitor.start()
+                // Only check permissions if we don't have them yet or aren't listening
+                if !self.isTrusted || !self.monitor.isListening {
+                    let nowTrusted = self.monitor.checkPermissionsSilent()
+                    if nowTrusted && !self.monitor.isListening {
+                        self.monitor.start()
+                    }
+                    self.isTrusted = nowTrusted || self.monitor.isListening
                 }
                 
-                self.isTrusted = nowTrusted || self.monitor.isListening
                 self.tapCreated = self.monitor.tapCreated
                 self.lastEventTime = self.monitor.lastEventTime
-                self.flush()
+                
+                // Check midnight crossing
+                let currentDay = Calendar.current.startOfDay(for: Date())
+                if currentDay != self.lastKnownDay {
+                    self.flush() // flush remaining for old day
+                    self.lastKnownDay = currentDay
+                    self.todayCount = 0
+                    self.activeDays += 1
+                }
+                
+                self.updateMovingAverages()
             }
         }
     }
@@ -112,7 +135,6 @@ final class StatsManager: ObservableObject, KeystrokeDelegate {
         currentMinuteCount += 1
         todayCount += 1
         totalCount += 1
-        lastHourCount += 1
     }
     
     private func decrement() {
@@ -120,7 +142,24 @@ final class StatsManager: ObservableObject, KeystrokeDelegate {
             currentMinuteCount -= 1
             todayCount = max(0, todayCount - 1)
             totalCount = max(0, totalCount - 1)
-            lastHourCount = max(0, lastHourCount - 1)
+        } else {
+            // Need to decrement from DB
+            let now = Date()
+            let midnight = Calendar.current.startOfDay(for: now)
+            let descriptor = FetchDescriptor<KeyBucket>(
+                predicate: #Predicate { $0.timestamp >= midnight && $0.count > 0 },
+                sortBy: [SortDescriptor(\.timestamp, order: .reverse)]
+            )
+            do {
+                if let lastBucket = try modelContext.fetch(descriptor).first {
+                    lastBucket.count -= 1
+                    try modelContext.save()
+                    todayCount = max(0, todayCount - 1)
+                    totalCount = max(0, totalCount - 1)
+                }
+            } catch {
+                print("Failed to decrement from DB: \(error)")
+            }
         }
     }
     
@@ -140,20 +179,16 @@ final class StatsManager: ObservableObject, KeystrokeDelegate {
             }
             try modelContext.save()
             currentMinuteCount = 0
-            refreshStats()
+            updateMovingAverages()
         } catch {
             print("Save error: \(error)")
         }
     }
     
-    func refreshStats() {
-        let now = Date()
-        let calendar = Calendar.current
-        let midnight = calendar.startOfDay(for: now)
-        todayCount = sum(from: midnight, to: now)
-        let hourAgo = now.addingTimeInterval(-3600)
-        lastHourCount = sum(from: hourAgo, to: now)
-        totalCount = sum(from: .distantPast, to: .distantFuture)
+    private func updateMovingAverages() {
+        let hourAgo = Date().addingTimeInterval(-3600)
+        let sumLastHour = sum(from: hourAgo, to: Date())
+        lastHourCount = sumLastHour + currentMinuteCount
     }
     
     private func sum(from: Date, to: Date) -> Int {
@@ -167,19 +202,39 @@ final class StatsManager: ObservableObject, KeystrokeDelegate {
     }
     
     private func loadInitialStats() {
-        refreshStats()
+        let now = Date()
+        let midnight = Calendar.current.startOfDay(for: now)
+        self.lastKnownDay = midnight
+        
+        todayCount = sum(from: midnight, to: now)
+        
+        // Calculate Total
+        totalCount = sum(from: .distantPast, to: .distantFuture)
+        
+        // Calculate Active Days
+        do {
+            let descriptor = FetchDescriptor<KeyBucket>(predicate: #Predicate { $0.count > 0 })
+            let buckets = try modelContext.fetch(descriptor)
+            let days = Set(buckets.map { Calendar.current.startOfDay(for: $0.timestamp) })
+            activeDays = max(1, days.count)
+        } catch {
+            activeDays = 1
+        }
+        
+        updateMovingAverages()
     }
     
     func resetToday() {
         let now = Date()
-        let calendar = Calendar.current
-        let midnight = calendar.startOfDay(for: now)
+        let midnight = Calendar.current.startOfDay(for: now)
         let predicate = #Predicate<KeyBucket> { $0.timestamp >= midnight }
         do {
             try modelContext.delete(model: KeyBucket.self, where: predicate)
             try modelContext.save()
             currentMinuteCount = 0
-            refreshStats()
+            todayCount = 0
+            totalCount = sum(from: .distantPast, to: .distantFuture)
+            updateMovingAverages()
         } catch {
             print("Reset error: \(error)")
         }
@@ -190,7 +245,10 @@ final class StatsManager: ObservableObject, KeystrokeDelegate {
             try modelContext.delete(model: KeyBucket.self)
             try modelContext.save()
             currentMinuteCount = 0
-            refreshStats()
+            todayCount = 0
+            totalCount = 0
+            activeDays = 1
+            updateMovingAverages()
         } catch {
             print("Reset error: \(error)")
         }
@@ -211,13 +269,7 @@ final class StatsManager: ObservableObject, KeystrokeDelegate {
         return todayCount / hour
     }
     
-    func averagePerDay() -> Int {
-        do {
-            let buckets = try modelContext.fetch(FetchDescriptor<KeyBucket>())
-            let days = Set(buckets.filter { $0.count > 0 }.map { Calendar.current.startOfDay(for: $0.timestamp) })
-            return days.isEmpty ? todayCount : totalCount / days.count
-        } catch {
-            return 0
-        }
+    var averagePerDay: Int {
+        return totalCount / max(1, activeDays)
     }
 }

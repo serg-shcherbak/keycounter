@@ -9,7 +9,10 @@ protocol KeystrokeDelegate: AnyObject {
 final class KeystrokeMonitor: @unchecked Sendable {
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
+    private var runLoop: CFRunLoop?
     private var thread: Thread?
+    
+    private let stateLock = NSLock()
     
     weak var delegate: KeystrokeDelegate?
     
@@ -24,20 +27,24 @@ final class KeystrokeMonitor: @unchecked Sendable {
     init() {}
     
     func start() {
-        if _isListening.value { stop() }
+        stateLock.lock()
+        defer { stateLock.unlock() }
+        
+        guard !_isListening.value else { return }
         
         _tapCreated.set(false)
-        thread = Thread { [weak self] in
+        let newThread = Thread { [weak self] in
             self?.run()
         }
-        thread?.name = "org.keycount.monitor"
-        thread?.start()
+        newThread.name = "org.keycount.monitor"
+        self.thread = newThread
+        newThread.start()
     }
     
     private func run() {
         let eventMask = (1 << CGEventType.keyDown.rawValue)
         
-        eventTap = CGEvent.tapCreate(
+        let tap = CGEvent.tapCreate(
             tap: .cgSessionEventTap, 
             place: .headInsertEventTap,
             options: .listenOnly,
@@ -56,19 +63,27 @@ final class KeystrokeMonitor: @unchecked Sendable {
             userInfo: UnsafeMutableRawPointer(Unmanaged.passUnretained(self).toOpaque())
         )
         
-        guard let eventTap = eventTap else {
+        guard let tap = tap else {
             return
         }
         
         _tapCreated.set(true)
-        runLoopSource = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, eventTap, 0)
-        guard let source = runLoopSource else { return }
+        let source = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0)
+        guard let source = source else { return }
+        
+        stateLock.lock()
+        self.eventTap = tap
+        self.runLoopSource = source
+        self.runLoop = CFRunLoopGetCurrent()
+        stateLock.unlock()
         
         CFRunLoopAddSource(CFRunLoopGetCurrent(), source, .commonModes)
-        CGEvent.tapEnable(tap: eventTap, enable: true)
+        CGEvent.tapEnable(tap: tap, enable: true)
         
         _isListening.set(true)
         CFRunLoopRun()
+        
+        _isListening.set(false)
     }
     
     func recordEvent() {
@@ -76,24 +91,29 @@ final class KeystrokeMonitor: @unchecked Sendable {
     }
     
     func stop() {
-        _isListening.set(false)
+        stateLock.lock()
+        defer { stateLock.unlock() }
+        
         if let tap = eventTap {
             CGEvent.tapEnable(tap: tap, enable: false)
         }
-        if let source = runLoopSource {
-            CFRunLoopSourceInvalidate(source)
+        if let source = runLoopSource, let rl = runLoop {
+            CFRunLoopRemoveSource(rl, source, .commonModes)
+        }
+        if let rl = runLoop {
+            CFRunLoopStop(rl)
         }
         eventTap = nil
         runLoopSource = nil
+        runLoop = nil
         thread = nil
+        _isListening.set(false)
     }
     
-    // ТИХАЯ проверка прав (без вызова окна)
     func checkPermissionsSilent() -> Bool {
         return AXIsProcessTrusted()
     }
     
-    // ПРИНУДИТЕЛЬНЫЙ запрос прав (с вызовом окна)
     func requestPermissionsWithPrompt() {
         let options = ["AXTrustedCheckOptionPrompt": true] as CFDictionary
         _ = AXIsProcessTrustedWithOptions(options)

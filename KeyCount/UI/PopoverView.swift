@@ -204,22 +204,32 @@ struct PopoverView: View {
             HStack {
                 Image(systemName: "lock.shield.fill")
                     .foregroundColor(.orange)
-                Text("Permission Required")
+                Text("Permissions Required")
                     .font(.subheadline).bold()
             }
-            Text("1. Open Settings -> Accessibility\n2. If KeyCount is missing, click '+' and add it manually from Applications\n3. Ensure the toggle is ON")
+            Text("1. Remove KeyCount using '-' in BOTH sections\n2. Click '+' to add it back and enable")
                 .font(.system(size: 10))
                 .multilineTextAlignment(.center)
                 .foregroundColor(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             
-            Button("Open System Settings") {
-                stats.requestSystemPermissions()
-                let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!
-                NSWorkspace.shared.open(url)
+            HStack {
+                Button("Accessibility") {
+                    stats.requestSystemPermissions()
+                    let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!
+                    NSWorkspace.shared.open(url)
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
+                
+                Button("Input Monitoring") {
+                    stats.requestSystemPermissions()
+                    let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent")!
+                    NSWorkspace.shared.open(url)
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
             }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.small)
         }
         .padding(12)
         .background(Color.orange.opacity(0.1))
