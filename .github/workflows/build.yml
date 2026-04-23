@@ -45,7 +45,9 @@ jobs:
             <key>LSUIElement</key>
             <true/>
             <key>NSAccessibilityUsageDescription</key>
-            <string>KeyCount needs access to count keystrokes for statistics.</string>
+            <string>KeyCount needs Accessibility access to track your keystroke statistics.</string>
+            <key>NSInputMonitoringUsageDescription</key>
+            <string>KeyCount needs Input Monitoring access to count your keystrokes for productivity stats.</string>
         </dict>
         </plist>
         EOF

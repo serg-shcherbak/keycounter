@@ -195,6 +195,8 @@ final class StatsManager: ObservableObject, KeystrokeDelegate {
     
     func forceRestartMonitor() {
         monitor.stop()
+        monitor = KeystrokeMonitor() // Create fresh object
+        monitor.delegate = self
         monitor.start()
         isTrusted = monitor.checkPermissions()
     }

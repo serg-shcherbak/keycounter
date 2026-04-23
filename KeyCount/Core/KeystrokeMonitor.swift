@@ -9,19 +9,33 @@ protocol KeystrokeDelegate: AnyObject {
 final class KeystrokeMonitor {
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
+    private var thread: Thread?
+    
     weak var delegate: KeystrokeDelegate?
     
-    private(set) var isListening = false
+    // Using a thread-safe boolean
+    private let _isListening = AtomicBool(false)
+    var isListening: Bool { _isListening.value }
     
     init() {}
     
     func start() {
-        if isListening { stop() }
+        guard !_isListening.value else { return }
         
+        // Start the monitor in a dedicated background thread
+        thread = Thread { [weak self] in
+            self?.run()
+        }
+        thread?.name = "com.keycount.keystroke-monitor"
+        thread?.start()
+    }
+    
+    private func run() {
         let eventMask = (1 << CGEventType.keyDown.rawValue)
         
+        // We use .cghidEventTap for better reliability in background apps on macOS 15+
         eventTap = CGEvent.tapCreate(
-            tap: .cgSessionEventTap,
+            tap: .cghidEventTap, 
             place: .headInsertEventTap,
             options: .listenOnly,
             eventsOfInterest: CGEventMask(eventMask),
@@ -30,6 +44,7 @@ final class KeystrokeMonitor {
                 let monitor = Unmanaged<KeystrokeMonitor>.fromOpaque(refcon).takeUnretainedValue()
                 
                 if type == .keyDown {
+                    // Send to delegate
                     monitor.delegate?.didCaptureKey(event: event)
                 }
                 
@@ -39,33 +54,69 @@ final class KeystrokeMonitor {
         )
         
         guard let eventTap = eventTap else {
-            isListening = false
+            print("KeystrokeMonitor: Failed to create event tap.")
             return
         }
         
         runLoopSource = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, eventTap, 0)
-        if let source = runLoopSource {
-            CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)
-            CGEvent.tapEnable(tap: eventTap, enable: true)
-            isListening = true
-        }
+        guard let source = runLoopSource else { return }
+        
+        CFRunLoopAddSource(CFRunLoopGetCurrent(), source, .commonModes)
+        CGEvent.tapEnable(tap: eventTap, enable: true)
+        
+        _isListening.set(true)
+        
+        // Keep the thread alive
+        CFRunLoopRun()
     }
     
     func stop() {
+        guard _isListening.value else { return }
+        
         if let tap = eventTap {
             CGEvent.tapEnable(tap: tap, enable: false)
         }
-        if let source = runLoopSource {
-            CFRunLoopRemoveSource(CFRunLoopGetMain(), source, .commonModes)
+        
+        // Stop the RunLoop in the background thread
+        if let thread = thread {
+            // We need to stop the runloop from within the thread itself 
+            // but for simplicity we'll just invalidate the source
+            if let source = runLoopSource {
+                // This doesn't stop the loop immediately but invalidates the source
+                CFRunLoopSourceInvalidate(source)
+            }
         }
+        
         eventTap = nil
         runLoopSource = nil
-        isListening = false
+        thread = nil
+        _isListening.set(false)
     }
     
     func checkPermissions() -> Bool {
-        // AXIsProcessTrusted() без аргументов просто возвращает текущий статус
-        // Это безопасно в Swift 6
+        // AXIsProcessTrusted is the most reliable "soft" check
         return AXIsProcessTrusted()
+    }
+}
+
+// Simple Atomic helper
+final class AtomicBool: @unchecked Sendable {
+    private let lock = NSLock()
+    private var _value: Bool
+    
+    init(_ value: Bool) {
+        self._value = value
+    }
+    
+    var value: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return _value
+    }
+    
+    func set(_ newValue: Bool) {
+        lock.lock()
+        defer { lock.unlock() }
+        _value = newValue
     }
 }
