@@ -21,3 +21,8 @@
 
 ## Permissions
 The app uses `CGEventTap` which requires **Accessibility** (TCC) permissions. Due to the lack of code signing in development/CI builds, manual addition to the Accessibility list via the `+` button in System Settings is often required.
+
+## 🚀 Backlog & Future Tasks
+- [ ] **Silent Start:** Modify the permission check logic to completely avoid automatic system prompts on startup. The app should remain silent and only show the in-app "Permission Required" banner, allowing the user to trigger the prompt manually when ready. This prevents the "focus-stealing" loop on new installations.
+- [ ] **Visual Charts:** Add historical trends and daily/weekly graphs using the minute-bucket data.
+- [ ] **Export Feature:** Export statistics to CSV or JSON.
