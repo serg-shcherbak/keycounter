@@ -9,36 +9,14 @@ struct PopoverView: View {
     
     @AppStorage("showCountInMenubar") private var showCountInMenubar = true
     @AppStorage("launchAtLogin") private var launchAtLogin = false
+    @AppStorage("showDiagnostics") private var showDiagnostics = false
     
     var body: some View {
         VStack(spacing: 0) {
             // Tab Switcher Header
             HStack(spacing: 0) {
-                Button(action: { selectedTab = 0 }) {
-                    VStack(spacing: 4) {
-                        Text("Stats")
-                            .fontWeight(selectedTab == 0 ? .bold : .regular)
-                            .foregroundColor(selectedTab == 0 ? .primary : .secondary)
-                        Rectangle()
-                            .fill(selectedTab == 0 ? Color.blue : Color.clear)
-                            .frame(height: 2)
-                    }
-                }
-                .buttonStyle(.plain)
-                .frame(maxWidth: .infinity)
-                
-                Button(action: { selectedTab = 1 }) {
-                    VStack(spacing: 4) {
-                        Text("Settings")
-                            .fontWeight(selectedTab == 1 ? .bold : .regular)
-                            .foregroundColor(selectedTab == 1 ? .primary : .secondary)
-                        Rectangle()
-                            .fill(selectedTab == 1 ? Color.blue : Color.clear)
-                            .frame(height: 2)
-                    }
-                }
-                .buttonStyle(.plain)
-                .frame(maxWidth: .infinity)
+                tabButton(title: "Statistics", index: 0)
+                tabButton(title: "Settings", index: 1)
             }
             .padding(.top, 12)
             .padding(.horizontal)
@@ -47,123 +25,149 @@ struct PopoverView: View {
             
             if selectedTab == 0 {
                 statsView
+                    .transition(.opacity)
             } else {
                 settingsView
+                    .transition(.opacity)
             }
         }
         .frame(width: 280)
+        .animation(.easeInOut(duration: 0.2), value: selectedTab)
     }
     
+    private func tabButton(title: String, index: Int) -> some View {
+        Button(action: { selectedTab = index }) {
+            VStack(spacing: 6) {
+                Text(title)
+                    .font(.system(size: 12, weight: selectedTab == index ? .bold : .medium))
+                    .foregroundColor(selectedTab == index ? .primary : .secondary)
+                Rectangle()
+                    .fill(selectedTab == index ? Color.blue : Color.clear)
+                    .frame(height: 2)
+            }
+        }
+        .buttonStyle(.plain)
+        .frame(maxWidth: .infinity)
+    }
+    
+    // MARK: - Stats View
     var statsView: some View {
         VStack(spacing: 0) {
             if !stats.isTrusted && !stats.monitorIsListening {
                 permissionBanner
             }
             
-            VStack(spacing: 12) {
+            VStack(spacing: 14) {
                 StatRow(label: "Today", value: stats.todayCount)
                 StatRow(label: "Last Hour", value: stats.lastHourCount)
                 
-                Divider().padding(.vertical, 4)
+                Divider().padding(.vertical, 2)
                 
-                StatRow(label: "Avg per Hour", value: stats.averagePerHour)
-                StatRow(label: "Avg per Day", value: stats.averagePerDay())
+                StatGroup(title: "Averages") {
+                    StatRow(label: "Per Hour", value: stats.averagePerHour)
+                    StatRow(label: "Per Day", value: stats.averagePerDay())
+                }
                 
-                Divider().padding(.vertical, 4)
+                Divider().padding(.vertical, 2)
                 
-                StatRow(label: "Total", value: stats.totalCount)
+                StatRow(label: "Total Keystrokes", value: stats.totalCount)
+                    .fontWeight(.bold)
             }
-            .padding()
+            .padding(.horizontal, 20)
+            .padding(.vertical, 16)
             
             Divider()
             
-            HStack(spacing: 10) {
-                Button("Reset Today") {
-                    showingResetTodayAlert = true
+            HStack(spacing: 12) {
+                Button(action: { showingResetTodayAlert = true }) {
+                    Label("Reset Today", systemImage: "arrow.counterclockwise")
+                        .font(.caption)
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
                 
-                Button("Full Reset") {
-                    showingResetAllAlert = true
+                Button(action: { showingResetAllAlert = true }) {
+                    Label("Full Reset", systemImage: "trash")
+                        .font(.caption)
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
             }
-            .padding()
+            .padding(.vertical, 12)
         }
-        .alert("Reset Today", isPresented: $showingResetTodayAlert) {
+        .alert("Reset Today's Data?", isPresented: $showingResetTodayAlert) {
             Button("Reset Today", role: .destructive) { stats.resetToday() }
             Button("Cancel", role: .cancel) { }
         } message: {
-            Text("Today's data will be deleted.")
+            Text("This will clear all keystrokes recorded since midnight.")
         }
-        .alert("Full Reset", isPresented: $showingResetAllAlert) {
-            Button("Reset All", role: .destructive) { stats.resetAll() }
+        .alert("Perform Full Reset?", isPresented: $showingResetAllAlert) {
+            Button("Reset Everything", role: .destructive) { stats.resetAll() }
             Button("Cancel", role: .cancel) { }
         } message: {
-            Text("All history will be permanently deleted.")
+            Text("This will permanently delete all history and statistics. This action cannot be undone.")
         }
     }
     
+    // MARK: - Settings View
     var settingsView: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 20) {
+                // General
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("General").font(.caption).bold().foregroundColor(.secondary)
                     Toggle("Show counter in menu bar", isOn: $showCountInMenubar)
                     Toggle("Launch at login", isOn: $launchAtLogin)
                 }
                 
                 Divider()
                 
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Counting Mode").font(.subheadline).foregroundColor(.secondary)
-                    Picker("", selection: $stats.countingMode) {
+                // Counting
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Counting Strategy").font(.caption).bold().foregroundColor(.secondary)
+                    Picker("Mode", selection: $stats.countingMode) {
                         ForEach(CountingMode.allCases, id: \.self) { mode in
                             Text(mode.localizedName).tag(mode)
                         }
                     }
                     .pickerStyle(.menu)
-                    .labelsHidden()
                     
-                    Toggle("Count Enter as a key", isOn: $stats.countEnter)
-                        .disabled(stats.countingMode != .smart)
+                    if stats.countingMode == .smart {
+                        Toggle("Count 'Enter' key", isOn: $stats.countEnter)
+                            .font(.subheadline)
+                    }
                 }
                 
                 Divider()
                 
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Diagnostics").font(.subheadline).foregroundColor(.secondary)
-                    Group {
-                        DiagnosticRow(label: "Bundle ID", value: Bundle.main.bundleIdentifier ?? "Unknown")
-                        DiagnosticRow(label: "Trusted", value: stats.isTrusted ? "YES" : "NO")
-                        DiagnosticRow(label: "Tap Created", value: stats.tapCreated ? "YES" : "NO")
-                        DiagnosticRow(label: "Tap Active", value: stats.monitorIsListening ? "YES" : "NO")
-                    }
-                    .font(.system(size: 10, design: .monospaced))
+                // Advanced
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Advanced").font(.caption).bold().foregroundColor(.secondary)
+                    Toggle("Show Debug Info", isOn: $showDiagnostics)
                     
-                    if !stats.isTrusted {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("If Trusted is NO but checkbox is ON:").bold().font(.caption)
+                    if showDiagnostics {
+                        VStack(alignment: .leading, spacing: 6) {
+                            DiagnosticRow(label: "Bundle ID", value: Bundle.main.bundleIdentifier ?? "Unknown")
+                            DiagnosticRow(label: "Accessibility Trusted", value: stats.isTrusted ? "YES" : "NO")
+                            DiagnosticRow(label: "Event Tap Created", value: stats.tapCreated ? "YES" : "NO")
+                            DiagnosticRow(label: "Event Tap Active", value: stats.monitorIsListening ? "YES" : "NO")
                             
                             let cmd = "tccutil reset Accessibility \(Bundle.main.bundleIdentifier ?? "org.keycount.app")"
-                            
                             Button(action: {
                                 NSPasteboard.general.clearContents()
                                 NSPasteboard.general.setString(cmd, forType: .string)
                             }) {
-                                HStack {
-                                    Image(systemName: "doc.on.doc")
-                                    Text("Copy Reset Command")
-                                }
-                                .font(.caption)
+                                Label("Copy TCC Reset Command", systemImage: "doc.on.doc")
+                                    .font(.system(size: 10))
                             }
-                            .buttonStyle(.bordered)
+                            .buttonStyle(.link)
                         }
-                        .padding(.top, 4)
+                        .padding(8)
+                        .background(Color.primary.opacity(0.05))
+                        .cornerRadius(4)
                     }
                     
-                    Button("Restart Tracking") {
+                    Button("Restart Key Monitoring") {
                         stats.forceRestartMonitor()
                     }
                     .buttonStyle(.bordered)
@@ -172,41 +176,44 @@ struct PopoverView: View {
                 
                 Divider()
                 
+                // Quit
                 Button(role: .destructive) {
                     NSApp.terminate(nil)
                 } label: {
                     HStack {
                         Spacer()
+                        Image(systemName: "power")
                         Text("Quit KeyCount")
                         Spacer()
                     }
                 }
                 .buttonStyle(.bordered)
                 
-                Text("Version 1.0.8")
+                Text("KeyCount v1.0.9 (Production Ready)")
                     .font(.system(size: 9))
                     .foregroundColor(.secondary)
                     .frame(maxWidth: .infinity, alignment: .center)
             }
-            .padding()
+            .padding(20)
         }
-        .frame(maxHeight: 400)
+        .frame(maxHeight: 450)
     }
     
     var permissionBanner: some View {
         VStack(spacing: 8) {
             HStack {
-                Image(systemName: "exclamationmark.triangle.fill")
+                Image(systemName: "lock.shield.fill")
                     .foregroundColor(.orange)
                 Text("Permission Required")
                     .font(.subheadline).bold()
             }
-            Text("1. Open System Settings\n2. REMOVE KeyCount from Accessibility using '-' button\n3. Click 'Open Settings' below and grant access again")
+            Text("1. Open Settings -> Accessibility\n2. If KeyCount is missing, click '+' and add it manually from Applications\n3. Ensure the toggle is ON")
                 .font(.system(size: 10))
                 .multilineTextAlignment(.center)
                 .foregroundColor(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
             
-            Button("Open Settings") {
+            Button("Open System Settings") {
                 stats.requestSystemPermissions()
                 let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!
                 NSWorkspace.shared.open(url)
@@ -214,8 +221,25 @@ struct PopoverView: View {
             .buttonStyle(.borderedProminent)
             .controlSize(.small)
         }
-        .padding()
+        .padding(12)
         .background(Color.orange.opacity(0.1))
+    }
+}
+
+struct StatGroup<Content: View>: View {
+    let title: String
+    let content: Content
+    
+    init(title: String, @ViewBuilder content: () -> Content) {
+        self.title = title
+        self.content = content()
+    }
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title).font(.system(size: 10, weight: .bold)).foregroundColor(.secondary).uppercaseSmallCaps()
+            content
+        }
     }
 }
 
@@ -238,9 +262,9 @@ struct DiagnosticRow: View {
     let value: String
     var body: some View {
         HStack {
-            Text(label)
+            Text(label).font(.system(size: 9))
             Spacer()
-            Text(value).bold()
+            Text(value).font(.system(size: 9, weight: .bold))
         }
     }
 }
