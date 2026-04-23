@@ -3,10 +3,10 @@ import SwiftData
 
 @main
 struct KeyCountApp: App {
-    // Контейнер SwiftData
+    // SwiftData container
     let container: ModelContainer
     
-    // Менеджер статистики (StateObject для жизненного цикла)
+    // Stats manager (StateObject for lifecycle)
     @StateObject private var stats: StatsManager
     
     @AppStorage("showCountInMenubar") private var showCountInMenubar = true
@@ -22,20 +22,20 @@ struct KeyCountApp: App {
     }
     
     var body: some Scene {
-        // Основной элемент приложения - Menu Bar
+        // Main Menu Bar Extra
         MenuBarExtra {
             PopoverView(stats: stats)
-        label: {
+        } label: {
             if showCountInMenubar {
                 Text(NumberFormatterUtils.formatXK(stats.todayCount))
                     .font(.system(.body, design: .monospaced))
             } else {
-                Image(systemName: "keyboard") // Show icon if text is hidden
+                Image(systemName: "keyboard")
             }
         }
-        .menuBarExtraStyle(.window) // Чтобы открывался Popover/Окно
+        .menuBarExtraStyle(.window)
         
-        // Окно настроек
+        // Settings Window
         Settings {
             SettingsView(stats: stats)
         }
