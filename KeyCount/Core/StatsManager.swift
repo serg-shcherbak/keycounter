@@ -5,54 +5,51 @@ import AppKit
 
 @MainActor
 final class StatsManager: ObservableObject, KeystrokeDelegate {
-    // Параметры для SwiftData
     private var modelContext: ModelContext
     
-    // Текущие счетчики (In-memory для производительности)
     @Published private(set) var todayCount: Int = 0
     @Published private(set) var lastHourCount: Int = 0
     @Published private(set) var totalCount: Int = 0
     
-    // Настройки
     @Published var countingMode: CountingMode = .smart
     @Published var countEnter: Bool = false
-    @Published private(set) var isTrusted: Bool = false
+    @Published var isTrusted: Bool = false
     
     private var monitor: KeystrokeMonitor
     private var flushTimer: Timer?
     
-    // Буфер для текущей минуты
     private var currentMinuteCount: Int = 0
-    private var lastFlushTime: Date = Date()
     
     init(modelContainer: ModelContainer) {
         self.modelContext = ModelContext(modelContainer)
         self.monitor = KeystrokeMonitor()
         
-        // Загрузка начальных данных
         loadInitialStats()
         
         self.monitor.delegate = self
         self.monitor.start()
         
+        // Initial check
         self.isTrusted = self.monitor.checkPermissions()
         
-        self.flushTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
+        // Frequent check for permissions and flushing
+        self.flushTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: true) { [weak self] _ in
             Task { @MainActor in
-                let nowTrusted = self?.monitor.checkPermissions() ?? false
-                if nowTrusted && !(self?.isTrusted ?? true) {
-                    self?.monitor.start() // Restart if permissions granted
+                guard let self = self else { return }
+                let nowTrusted = self.monitor.checkPermissions()
+                
+                // If permission state changed to true, restart monitor
+                if nowTrusted && !self.isTrusted {
+                    self.monitor.start()
                 }
-                self?.isTrusted = nowTrusted
-                self?.flush()
+                
+                // If monitor is actually listening, we are trusted
+                self.isTrusted = nowTrusted || self.monitor.isListening
+                self.flush()
             }
         }
     }
     
-    // MARK: - KeystrokeDelegate
-    
-    // Делаем метод неизолированным для соответствия протоколу, 
-    // но сразу перебрасываем выполнение на MainActor
     nonisolated func didCaptureKey(event: CGEvent) {
         let flags = event.flags
         let keyCode = Int(event.getIntegerValueField(.keyboardEventKeycode))
@@ -63,8 +60,11 @@ final class StatsManager: ObservableObject, KeystrokeDelegate {
     }
     
     private func processKeyEvent(flags: CGEventFlags, keyCode: Int) {
+        // If we received an event, we definitely have permission
+        if !isTrusted { isTrusted = true }
+        
         var shouldCount = false
-        let isBackspace = (keyCode == 51) // macOS backspace keycode
+        let isBackspace = (keyCode == 51)
         
         switch countingMode {
         case .smart:
@@ -75,7 +75,7 @@ final class StatsManager: ObservableObject, KeystrokeDelegate {
             if !hasModifiers {
                 if isBackspace {
                     shouldCount = true
-                } else if keyCode == 36 { // Enter
+                } else if keyCode == 36 {
                     shouldCount = countEnter
                 } else {
                     shouldCount = true
@@ -99,8 +99,6 @@ final class StatsManager: ObservableObject, KeystrokeDelegate {
         }
     }
     
-    // MARK: - Logic
-    
     private func increment() {
         currentMinuteCount += 1
         todayCount += 1
@@ -119,10 +117,8 @@ final class StatsManager: ObservableObject, KeystrokeDelegate {
     
     func flush() {
         guard currentMinuteCount != 0 else { return }
-        
         let now = Date()
         let minuteTs = KeyBucket.normalizedTimestamp(now)
-        
         let descriptor = FetchDescriptor<KeyBucket>(predicate: #Predicate { $0.timestamp == minuteTs })
         
         do {
@@ -137,7 +133,7 @@ final class StatsManager: ObservableObject, KeystrokeDelegate {
             currentMinuteCount = 0
             refreshStats()
         } catch {
-            print("Failed to save buckets: \(error)")
+            print("Failed to save: \(error)")
         }
     }
     
@@ -167,13 +163,10 @@ final class StatsManager: ObservableObject, KeystrokeDelegate {
         refreshStats()
     }
     
-    // MARK: - Reset Actions
-    
     func resetToday() {
         let now = Date()
         let calendar = Calendar.current
         let midnight = calendar.startOfDay(for: now)
-        
         let predicate = #Predicate<KeyBucket> { $0.timestamp >= midnight }
         do {
             try modelContext.delete(model: KeyBucket.self, where: predicate)
@@ -181,7 +174,7 @@ final class StatsManager: ObservableObject, KeystrokeDelegate {
             currentMinuteCount = 0
             refreshStats()
         } catch {
-            print("Failed to reset today: \(error)")
+            print("Reset error: \(error)")
         }
     }
     
@@ -192,11 +185,9 @@ final class StatsManager: ObservableObject, KeystrokeDelegate {
             currentMinuteCount = 0
             refreshStats()
         } catch {
-            print("Failed to reset all: \(error)")
+            print("Reset error: \(error)")
         }
     }
-    
-    // MARK: - Computed Averages
     
     var averagePerHour: Int {
         let calendar = Calendar.current

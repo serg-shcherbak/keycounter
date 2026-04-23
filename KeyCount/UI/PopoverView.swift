@@ -15,15 +15,22 @@ struct PopoverView: View {
                 
                 Spacer()
                 
-                // Троеточие - заменяем Menu на кнопку, которая открывает нативное меню
-                Button {
-                    showContextMenu()
+                // Троеточие с нативным меню
+                Menu {
+                    Button("Settings...") {
+                        openSettings()
+                    }
+                    Divider()
+                    Button("Quit KeyCount") {
+                        NSApp.terminate(nil)
+                    }
                 } label: {
                     Image(systemName: "ellipsis.circle")
                         .font(.title3)
                         .foregroundColor(.secondary)
                 }
-                .buttonStyle(.plain)
+                .menuStyle(.borderlessButton)
+                .fixedSize()
             }
             .padding()
             
@@ -40,21 +47,20 @@ struct PopoverView: View {
                             .fontWeight(.bold)
                     }
                     
-                    Text("1. Open System Settings\n2. Go to Privacy & Security\n3. Select **Input Monitoring**\n4. Enable **KeyCount**")
+                    Text("1. Open System Settings\n2. Go to Privacy & Security\n3. Select **Accessibility**\n4. Enable **KeyCount**")
                         .font(.caption)
                         .multilineTextAlignment(.leading)
                         .foregroundColor(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                     
                     Button("Open System Settings") {
-                        // Открываем конкретно Input Monitoring
-                        let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent")!
+                        let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!
                         NSWorkspace.shared.open(url)
                     }
                     .buttonStyle(.borderedProminent)
                     .controlSize(.small)
                     
-                    Text("Note: If already enabled, toggle it OFF and ON again.")
+                    Text("Note: If enabled, toggle it OFF and ON again.")
                         .font(.system(size: 9))
                         .foregroundColor(.secondary)
                 }
@@ -109,14 +115,13 @@ struct PopoverView: View {
         }
     }
     
-    private func showContextMenu() {
-        let menu = NSMenu()
-        menu.addItem(NSMenuItem(title: "Settings...", action: Selector(("showSettingsWindow:")), keyEquivalent: ","))
-        menu.addItem(NSMenuItem.separator())
-        menu.addItem(NSMenuItem(title: "Quit KeyCount", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
-        
-        let event = NSApp.currentEvent
-        NSMenu.popUpContextMenu(menu, with: event ?? NSEvent(), for: NSApp.keyWindow?.contentView ?? NSView())
+    private func openSettings() {
+        NSApp.activate(ignoringOtherApps: true)
+        if #available(macOS 13.0, *) {
+            NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+        } else {
+            NSApp.sendAction(Selector(("showPreferencesWindow:")), to: nil, from: nil)
+        }
     }
 }
 
